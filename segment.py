@@ -60,10 +60,35 @@ class Fitter:
         if not self.plotevaled:
             self.plotx = numpy.linspace(*self.xrange)
             self.ploty = self.eval(self.plotx)
+            self.plotevaled = True
         return self.plotx, self.ploty
 
     def __repr__(self):
         return "Fitter object"
+
+
+class ConstantPiecewise(Fitter):
+    """ Constant regression class fits its data with a single average"""
+    minlength = 1
+    cost = 3 # endpoints, coeffs
+    description = "Constants"
+    def __init__(self, data):
+        Fitter.__init__(self, data)
+        self.value = numpy.mean(self.data.y)
+        self.calcresiduals()
+        self.liney = self.eval(numpy.array(self.xrange))
+    
+    def eval(self, x):
+        rval = x.copy()
+        rval.fill(self.value)
+        return rval
+        
+    def plotvals(self):
+        return self.xrange, self.liney
+    
+    def __repr__(self):
+        return "Constant through %i data points: y = %f, error = %f" %  \
+               (len(self.data),) + self.coeff + (self.error,)
         
 class LinearRegression(Fitter):
     """ Linear regression class fits its data with straight line """
@@ -72,9 +97,8 @@ class LinearRegression(Fitter):
     description = "Linear regression"
     def __init__(self, data):
         Fitter.__init__(self, data)
-        self.coeff, self.residuals, _, _, _ = numpy.polyfit(self.data.x, self.data.y, 1, full=True)
+        self.coeff = numpy.polyfit(self.data.x, self.data.y, 1)
         self.calcresiduals()
-        self.error = numpy.linalg.norm(self.residuals)/len(self.data)
         self.liney = self.eval(self.xrange)
     
     def eval(self, x):
@@ -86,6 +110,25 @@ class LinearRegression(Fitter):
     def __repr__(self):
         return "Linear fit through %i data points: y = %f*x + %f, error = %f" %  \
                (len(self.data), self.coeff[0], self.coeff[1], self.error)
+
+class QuadraticRegression(Fitter):
+    """ Linear regression class fits its data with straight line """
+    minlength = 3
+    cost = 5 # endpoints, coeffs
+    description = "quadratic regression"
+    def __init__(self, data):
+        Fitter.__init__(self, data)
+        self.coeff = numpy.polyfit(self.data.x, self.data.y, 2)
+        self.calcresiduals()
+        self.liney = self.eval(self.xrange)
+    
+    def eval(self, x):
+        return numpy.polyval(self.coeff, x)
+        
+    def __repr__(self):
+        return "Quadratic fit through %i data points: y = %f*x^2 + %f*x + %f, error = %f" %  \
+               (len(self.data),) + self.coeff + (self.error,)
+
 
 class LineThroughEndPoints(Fitter):
     """ Straight line through data endpoints """
@@ -123,8 +166,10 @@ class ExponentialRegression(Fitter):
         try:
             popt, pcov = scipy.optimize.minpack.curve_fit(form, self.data.x, self.data.y, guess)
             self.offset, self.k, self.tau = popt
+            self.optimal = True
         except RuntimeError:
             self.offset, self.k, self.tau = guess
+            self.optimal = False
             
         self.calcresiduals()     
         
@@ -139,6 +184,7 @@ class ExponentialRegression(Fitter):
 def fitseterror(fits):
     return numpy.linalg.norm(numpy.hstack(f.residuals for f in fits))
 
+# For Dynamic Programming/Memoization of topdown results
 solutionstore = {}
 def topdown(data, fitbudget, fitter, depth=1):
     """
@@ -194,11 +240,11 @@ def testts():
 
 
 if __name__ == "__main__":
+    plotfits = False
     lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
     fronts = []
     fitrange = range(1, 7)
-    fittypes = (LinearRegression, LineThroughEndPoints, ExponentialRegression)
-#    fittypes = (ExponentialRegression,)
+    fittypes = (ConstantPiecewise, LinearRegression, QuadraticRegression, LineThroughEndPoints, ExponentialRegression)
     for fittype in fittypes:
         solutionstore = {}
         print fittype.description
@@ -210,14 +256,15 @@ if __name__ == "__main__":
             allfits.append(fits)
             fiterror.append(fitseterror(fits)/len(lineartest))
         fronts.append(fiterror)
-        for fits in allfits:
+        if plotfits:
+            for fits in allfits:
+                pylab.figure()
+                for f in fits:
+                    f.plot()
+                pylab.show()
             pylab.figure()
-            for f in fits:
-                f.plot()
+            pylab.plot(fitrange, fiterror)
             pylab.show()
-        pylab.figure()
-        pylab.plot(fitrange, fiterror)
-        pylab.show()
     pylab.figure()
     for front in fronts:
         pylab.plot(fitrange, front)
