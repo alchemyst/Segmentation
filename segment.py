@@ -244,7 +244,11 @@ if __name__ == "__main__":
     lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
     fronts = []
     fitrange = range(1, 7)
-    fittypes = (ConstantPiecewise, LinearRegression, QuadraticRegression, LineThroughEndPoints, ExponentialRegression)
+    fittypes = (ConstantPiecewise, 
+                LinearRegression, 
+                QuadraticRegression, 
+                LineThroughEndPoints, 
+                ExponentialRegression)
     for fittype in fittypes:
         solutionstore = {}
         print fittype.description
