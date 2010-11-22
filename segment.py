@@ -2,7 +2,7 @@
 
 # Time-series segmentation module
 
-import pylab
+import matplotlib.pyplot as plt
 import numpy
 import scipy.optimize
 import scikits.timeseries as ts
@@ -33,7 +33,7 @@ class DataContainer:
         return len(self.x)
     
     def plot(self):
-        pylab.plot(self.x, self.y, '.')
+        plt.plot(self.x, self.y, '.')
     
     def values(self):
         return self.x, self.y
@@ -54,7 +54,7 @@ class Fitter:
     def plot(self):
         self.data.plot()
         x, y = self.plotvals()
-        pylab.plot(x, y, '-')
+        plt.plot(x, y, '-')
 
     def plotvals(self):
         if not self.plotevaled:
@@ -236,11 +236,11 @@ def testts():
     tsp.tsplot(weight, '.')
     weight_avg = tsm.cmov_average(weight, 20)
     tsp.tsplot(weight_avg+1, weight_avg-1)
-    pylab.show()
+    plt.show()
 
 
 if __name__ == "__main__":
-    plotfits = False
+    plotfits = True
     lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
     fronts = []
     fitrange = range(1, 7)
@@ -258,15 +258,13 @@ if __name__ == "__main__":
         fronts.append(fiterror)
         if plotfits:
             for fits in allfits:
-                pylab.figure()
+                plt.figure()
                 for f in fits:
                     f.plot()
-                pylab.show()
-            pylab.figure()
-            pylab.plot(fitrange, fiterror)
-            pylab.show()
-    pylab.figure()
+            plt.figure()
+            plt.plot(fitrange, fiterror)
+    plt.figure()
     for front in fronts:
-        pylab.plot(fitrange, front)
-    pylab.legend([fit.description for fit in fittypes])
-    pylab.show()
+        plt.plot(fitrange, front)
+    plt.legend([fit.description for fit in fittypes])
+    plt.show()
