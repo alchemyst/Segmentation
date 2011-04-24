@@ -8,8 +8,11 @@ import scipy.optimize
 import scikits.timeseries as ts
 import scikits.timeseries.lib.plotlib as tsp
 import scikits.timeseries.lib.moving_funcs as tsm
+import sys
+import logging
+logging.basicConfig(level=logging.warn)
 
-class DataContainer:
+class DataContainer(object):
     """Generic container for timeseries data"""
 
     @staticmethod
@@ -22,9 +25,12 @@ class DataContainer:
     
     def __init__(self, x, y): 
         assert len(x) == len(y)
-        self.x = x
-        self.y = y
-        self.xrange = (min(self.x), max(self.x))
+        self.x = numpy.asarray(x)
+        self.y = numpy.asarray(y)
+    
+    @property
+    def xrange(self):
+        return (min(self.x), max(self.x))
     
     def __repr__(self):
         return "DataContainer x=" + str(self.x) + ", y=" + str(self.y)
@@ -39,9 +45,18 @@ class DataContainer:
         return self.x, self.y
 
     def split(self, i):
+        """ split the container at point i, returning two containers both containing that point """
         return DataContainer(self.x[:i], self.y[:i]), DataContainer(self.x[i-1:], self.y[i-1:])
+    
+    def __add__(self, other):
+        return DataContainer(numpy.append(self.x,  other.x), numpy.append(self.y, other.y))
+    
+    def merge(self, other):
+        self += other
+
 
 class Fitter:
+    stride = 1
     def __init__(self, data):
         self.data = data
         self.xrange = self.data.xrange
@@ -50,6 +65,11 @@ class Fitter:
     def calcresiduals(self):
         self.residuals = self.data.y - self.eval(self.data.x)
         self.error = numpy.linalg.norm(self.residuals)/len(self.data)
+
+    @classmethod
+    def divisions(self, N):
+        """ return iterator for division points of N-length data """
+        return xrange(self.minlength, N-self.minlength+1, self.stride)
     
     def plot(self):
         self.data.plot()
@@ -181,50 +201,117 @@ class ExponentialRegression(Fitter):
                (len(self.data), self.tau, self.k)
 
 
-def fitseterror(fits):
-    return numpy.linalg.norm(numpy.hstack(f.residuals for f in fits))
-
-# For Dynamic Programming/Memoization of topdown results
-solutionstore = {}
-def topdown(data, fitbudget, fitter, depth=1):
-    """
-    Top-Down piecewise fitting.  fitter is a function or class
-    that returns a fitted function
-    """
+class FitSet:
+    def __init__(self, fits=None):
+        if fits:
+            self.fits = fits
+        else:
+            self.fits = []
+            
+    def error(self):
+        return numpy.linalg.norm(numpy.hstack(f.residuals for f in self.fits))
     
-    def localtopdown(d, fitb):
-        problemparameters = d.xrange + (fitb,)
-        if problemparameters not in solutionstore:
-            solutionstore[problemparameters] = topdown(d, fitb, fitter, depth+1)
-        return solutionstore[problemparameters]
-    
-    fit = fitter(data)
-    if fitbudget == 1:
-        return [fit]
-    else:
-        N = len(data)
-        bestsofar = numpy.inf
-        bestfit = [fit]
-        for i in xrange(fitter.minlength, N-fitter.minlength+1):
-            # Do fits with subdivision at point i
-            ldata, rdata = data.split(i)
-            l = localtopdown(ldata, 1)
-            r = localtopdown(rdata, fitbudget - 1)
-            fits = l + r
-            totalerror = fitseterror(fits)/len(data)
-            # Remember best subdivision
-            if totalerror < bestsofar:
-                bestsofar = totalerror
-                # TODO: overload operator+ for fits
-                bestfit = fits
-            #print depth, len(solutionstore), data.xrange, totalerror, bestsofar
-        # return best subdivision
-        return bestfit
+    def plot(self):
+        for f in self.fits:
+            f.plot()
+            
+    def append(self, fit):
+        self.fits.append(fit)
+
+    def __add__(self, other):
+        return FitSet(self.fits + other.fits)
+            
+    def __repr__(self):
+        return self.fits.__repr__()
+        
+        
+#TODO: change logic to use FitSet class        
 
 
-def bottomup(T, epsilon):
+class SegmentationAlgorithm:
     pass
 
+class TopDown(SegmentationAlgorithm):
+    name = "TopDown"
+    
+    def __init__(self, fitter, fitbudget):
+        self.fitter = fitter
+        self.fitbudget = fitbudget
+        self.clearstore()
+        
+    def clearstore(self):
+        self.solutionstore = {}
+        self.done = False
+        
+    def topdown(self, data, fitbudget, depth=1):
+
+        def localtopdown(d, fitb):
+            problemparameters = d.xrange + (fitb,)
+            if problemparameters not in solutionstore:
+                self.solutionstore[problemparameters] = self.topdown(d, fitb, depth+1)
+            return self.solutionstore[problemparameters]
+        
+        fit = self.fitter(data)
+        if fitbudget == 1:
+            return FitSet([fit])
+        else:
+            N = len(data)
+            bestsofar = numpy.inf
+            bestfit = FitSet([fit])
+            for i in self.fitter.divisions(N):
+                # Do fits with subdivision at point i
+                ldata, rdata = data.split(i)
+                l = localtopdown(ldata, 1)
+                r = localtopdown(rdata, fitbudget - 1)
+                fits = l + r
+                totalerror = fits.error()/len(data)
+                # Remember best subdivision
+                if totalerror < bestsofar:
+                    bestsofar = totalerror
+                    bestfit = fits
+                logging.info("%10i, %10i, %10s, %10f, %10i" %  (depth, len(self.solutionstore), str(data.xrange), totalerror, bestsofar))
+            # return best subdivision
+            return bestfit
+            
+    def segment(self, data):
+        self.clearstore()
+        self.fits = self.topdown(data, self.fitbudget)
+        return self.fits
+
+class BottomUp(SegmentationAlgorithm):
+    name = "BottomUp"
+    
+    def __init__(self, fitter, fitbudget, epsilon=0.2):
+        self.fitter = fitter
+        self.fitbudget = fitbudget
+        self.epsilon = epsilon
+
+    def bottomup(self, data, fitbudget):
+        # Seed initial data
+        # NOTE: this is a really slow way of doing it.  Direct indexing would be much faster
+        
+        workingdata = []
+        fits = FitSet()
+        rest = data
+        for i in range(len(data)/self.fitter.stride - 1):
+            firstgroup, rest = rest.split(self.fitter.stride+1)
+            workingdata.append(firstgroup)
+            fits.append(self.fitter(firstgroup))
+    
+        initialerrors = fits.error()
+    
+        # build first level bigger fits
+        biggerfits = []
+    #    for i in range(len(fits)-1):
+    #        biggerfits.append(fitter(fits[i].))
+    
+        while fits.error() < self.epsilon:
+            break
+                        
+        return fits
+    
+    def segment(self, data):
+        return self.bottomup(data, self.fitbudget)
 
 def testts():
     d = ts.tsfromtxt('testdata/weight.dat',
@@ -241,14 +328,20 @@ def testts():
 
 if __name__ == "__main__":
     plotfits = True
-    lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
+    if len(sys.argv) < 2:
+        filename = 'testdata/tedat.dat'
+    else:
+         filename = sys.argv[1]
+    #lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
+    lineartest = DataContainer.fromfile(filename)
     fronts = []
-    fitrange = range(1, 7)
+    fitrange = range(15, 20)
     fittypes = (ConstantPiecewise, 
                 LinearRegression, 
                 QuadraticRegression, 
                 LineThroughEndPoints, 
-                ExponentialRegression)
+                #ExponentialRegression,
+                )
     for fittype in fittypes:
         solutionstore = {}
         print fittype.description
