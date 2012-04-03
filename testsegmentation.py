@@ -71,21 +71,17 @@ class TestTopDown(unittest.TestCase):
         self.data = segment.DataContainer.fromfile('testdata/almostlinear.dat')
     
     def testTopDown(self):
-        a = segment.topdown(self.data, 0.01, segment.LinearRegression)
+        s = segment.TopDown(segment.LinearRegression, 2)
+        s.segment(self.data)
 
 class TestBottomUp(unittest.TestCase):
     def setUp(self):
         self.data = segment.DataContainer.fromfile('testdata/almostlinear.dat')
     
     def testBottomUp(self):
-        a = segment.bottomup(self.data, 2, segment.LinearRegression, 0.2)
-
+        s = segment.BottomUp(segment.LinearRegression, 2)
+        s.segment(self.data)
         
-class TestAlmostLinear(unittest.TestCase):
-    def setUp(self):
-        self.d = numpy.loadtxt('testdata/almostlinear.dat', skiprows=1)
-        
-
 
 if __name__ == '__main__':
     unittest.main() 

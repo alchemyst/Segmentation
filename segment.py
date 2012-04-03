@@ -5,24 +5,21 @@
 import matplotlib.pyplot as plt
 import numpy
 import scipy.optimize
-import scikits.timeseries as ts
-import scikits.timeseries.lib.plotlib as tsp
-import scikits.timeseries.lib.moving_funcs as tsm
 import sys
 import logging
-logging.basicConfig(level=logging.warn)
+logging.basicConfig(level=logging.WARN)
 
 class DataContainer(object):
     """Generic container for timeseries data"""
 
     @staticmethod
     def fromtable(table):
-        return DataContainer(table[:,0], table[:,1])
+        return DataContainer(table[:, 0], table[:, 1])
 
     @staticmethod
     def fromfile(filename):
         return DataContainer.fromtable(numpy.loadtxt(filename, skiprows=1))
-    
+
     def __init__(self, x, y): 
         assert len(x) == len(y)
         self.x = numpy.asarray(x)
@@ -56,7 +53,6 @@ class DataContainer(object):
 
 
 class Fitter:
-    stride = 1
     def __init__(self, data):
         self.data = data
         self.xrange = self.data.xrange
@@ -67,9 +63,9 @@ class Fitter:
         self.error = numpy.linalg.norm(self.residuals)/len(self.data)
 
     @classmethod
-    def divisions(self, N):
+    def divisions(self, N, stride):
         """ return iterator for division points of N-length data """
-        return xrange(self.minlength, N-self.minlength+1, self.stride)
+        return xrange(self.minlength, N-self.minlength+1, stride)
     
     def plot(self):
         self.data.plot()
@@ -132,7 +128,7 @@ class LinearRegression(Fitter):
                (len(self.data), self.coeff[0], self.coeff[1], self.error)
 
 class QuadraticRegression(Fitter):
-    """ Linear regression class fits its data with straight line """
+    """ Quadratic regression class fits its data with a parabola """
     minlength = 3
     cost = 5 # endpoints, coeffs
     description = "quadratic regression"
@@ -201,13 +197,14 @@ class ExponentialRegression(Fitter):
                (len(self.data), self.tau, self.k)
 
 
-class FitSet:
+class FitSet(object):
     def __init__(self, fits=None):
         if fits:
             self.fits = fits
         else:
             self.fits = []
-            
+
+    @property    
     def error(self):
         return numpy.linalg.norm(numpy.hstack(f.residuals for f in self.fits))
     
@@ -215,12 +212,15 @@ class FitSet:
         for f in self.fits:
             f.plot()
             
-    def append(self, fit):
+    def append(self, fit):	
         self.fits.append(fit)
 
     def __add__(self, other):
         return FitSet(self.fits + other.fits)
             
+    def __len__(self):
+        return len(self.fits)
+    
     def __repr__(self):
         return self.fits.__repr__()
         
@@ -234,9 +234,10 @@ class SegmentationAlgorithm:
 class TopDown(SegmentationAlgorithm):
     name = "TopDown"
     
-    def __init__(self, fitter, fitbudget):
+    def __init__(self, fitter, fitbudget, stride=1):
         self.fitter = fitter
         self.fitbudget = fitbudget
+        self.stride = stride
         self.clearstore()
         
     def clearstore(self):
@@ -247,7 +248,7 @@ class TopDown(SegmentationAlgorithm):
 
         def localtopdown(d, fitb):
             problemparameters = d.xrange + (fitb,)
-            if problemparameters not in solutionstore:
+            if problemparameters not in self.solutionstore:
                 self.solutionstore[problemparameters] = self.topdown(d, fitb, depth+1)
             return self.solutionstore[problemparameters]
         
@@ -258,13 +259,13 @@ class TopDown(SegmentationAlgorithm):
             N = len(data)
             bestsofar = numpy.inf
             bestfit = FitSet([fit])
-            for i in self.fitter.divisions(N):
+            for i in self.fitter.divisions(N, self.stride):
                 # Do fits with subdivision at point i
                 ldata, rdata = data.split(i)
                 l = localtopdown(ldata, 1)
                 r = localtopdown(rdata, fitbudget - 1)
                 fits = l + r
-                totalerror = fits.error()/len(data)
+                totalerror = fits.error/len(data)
                 # Remember best subdivision
                 if totalerror < bestsofar:
                     bestsofar = totalerror
@@ -281,9 +282,10 @@ class TopDown(SegmentationAlgorithm):
 class BottomUp(SegmentationAlgorithm):
     name = "BottomUp"
     
-    def __init__(self, fitter, fitbudget, epsilon=0.2):
+    def __init__(self, fitter, fitbudget, stride=1, epsilon=0.2):
         self.fitter = fitter
         self.fitbudget = fitbudget
+        self.stride = 1
         self.epsilon = epsilon
 
     def bottomup(self, data, fitbudget):
@@ -293,21 +295,31 @@ class BottomUp(SegmentationAlgorithm):
         workingdata = []
         fits = FitSet()
         rest = data
-        for i in range(len(data)/self.fitter.stride - 1):
-            firstgroup, rest = rest.split(self.fitter.stride+1)
+        for i in range(len(data)/self.stride - 1):
+            firstgroup, rest = rest.split(self.stride+1)
             workingdata.append(firstgroup)
             fits.append(self.fitter(firstgroup))
     
-        initialerrors = fits.error()
-    
-        # build first level bigger fits
-        biggerfits = []
-    #    for i in range(len(fits)-1):
-    #        biggerfits.append(fitter(fits[i].))
-    
-        while fits.error() < self.epsilon:
-            break
-                        
+        initialerror = fits.error
+        
+        if initialerror > self.epsilon:
+            return fits
+        
+        while len(fits) > 1:
+            # build pairs of fits
+            pairs = [self.fitter(fits.fits[i].data + fits.fits[i+1].data) for i in range(len(fits)-1)]
+            # find best break
+            # FIXME: This is very slow, but it's easy to understand
+            bestbreak = 0
+            for i, p in enumerate(pairs):
+                if p.error < pairs[bestbreak].error:
+                    bestbreak = i
+            if pairs[bestbreak].error > self.epsilon:
+                break
+            # merge best break 
+            fits.fits[bestbreak] = pairs[bestbreak]
+            del fits.fits[bestbreak+1]
+            
         return fits
     
     def segment(self, data):
@@ -329,35 +341,38 @@ def testts():
 if __name__ == "__main__":
     plotfits = True
     if len(sys.argv) < 2:
-        filename = 'testdata/tedat.dat'
+        filename = 'testdata/weightindexed.dat'
+        stride = 10
     else:
-         filename = sys.argv[1]
+        filename = sys.argv[1]
+        stride = 1
+        
     #lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
     lineartest = DataContainer.fromfile(filename)
     fronts = []
-    fitrange = range(15, 20)
+    fitrange = range(3, 4)
     fittypes = (ConstantPiecewise, 
                 LinearRegression, 
                 QuadraticRegression, 
                 LineThroughEndPoints, 
-                #ExponentialRegression,
+                ExponentialRegression,
                 )
     for fittype in fittypes:
-        solutionstore = {}
         print fittype.description
         allfits = []
         fiterror = []
+        segmenter = TopDown(fittype, 1, stride=stride)
         for i in fitrange:
+            segmenter.fitbudget = i
             print "fitting %i items" % i
-            fits = topdown(lineartest, i, fittype)
+            fits = segmenter.segment(lineartest)
             allfits.append(fits)
-            fiterror.append(fitseterror(fits)/len(lineartest))
+            fiterror.append(fits.error/len(lineartest))
         fronts.append(fiterror)
         if plotfits:
             for fits in allfits:
                 plt.figure()
-                for f in fits:
-                    f.plot()
+                fits.plot()
             plt.figure()
             plt.plot(fitrange, fiterror)
     plt.figure()
