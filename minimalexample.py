@@ -27,5 +27,3 @@ for i, fit in enumerate(fits.fits):
 # plot a nice graph
 fits.plot()
 segment.plt.show()
-
-

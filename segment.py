@@ -21,7 +21,7 @@ class DataContainer(object):
     def fromfile(filename):
         return DataContainer.fromtable(numpy.loadtxt(filename, skiprows=1))
 
-    def __init__(self, x, y): 
+    def __init__(self, x, y):
         assert len(x) == len(y)
         self.x = numpy.asarray(x)
         self.y = numpy.asarray(y)
@@ -43,11 +43,13 @@ class DataContainer(object):
         return self.x, self.y
 
     def split(self, i):
-        """ split the container at point i, returning two containers both containing that point """
+        """ split the container at point i.
+        Returns: two containers both containing that point """
         return DataContainer(self.x[:i], self.y[:i]), DataContainer(self.x[i-1:], self.y[i-1:])
 
     def __add__(self, other):
-        return DataContainer(numpy.append(self.x,  other.x), numpy.append(self.y, other.y))
+        return DataContainer(numpy.append(self.x, other.x),
+                             numpy.append(self.y, other.y))
 
     def merge(self, other):
         # FIXME: merge is not symmetrical to split!
@@ -93,9 +95,9 @@ class Fitter:
 class ConstantPiecewise(Fitter):
     """ Constant regression class fits its data with a single average"""
     minlength = 1
-    cost = 3 # endpoints, coeffs
+    cost = 3    # endpoints, coeffs
     description = "Constants"
-    
+
     def __init__(self, data):
         Fitter.__init__(self, data)
         self.value = numpy.mean(self.data.y)
@@ -118,7 +120,7 @@ class ConstantPiecewise(Fitter):
 class LinearRegression(Fitter):
     """ Linear regression class fits its data with straight line """
     minlength = 2
-    cost = 4 # endpoints, coeffs
+    cost = 4  # endpoints, coeffs
     description = "Linear regression"
 
     def __init__(self, data):
@@ -141,8 +143,9 @@ class LinearRegression(Fitter):
 class QuadraticRegression(Fitter):
     """ Quadratic regression class fits its data with a parabola """
     minlength = 3
-    cost = 5 # endpoints, coeffs
+    cost = 5    # endpoints, coeffs
     description = "quadratic regression"
+
     def __init__(self, data):
         Fitter.__init__(self, data)
         self.coeff = numpy.polyfit(self.data.x, self.data.y, 2)
@@ -160,7 +163,7 @@ class QuadraticRegression(Fitter):
 class LineThroughEndPoints(Fitter):
     """ Straight line through data endpoints """
     minlength = 2
-    cost = 2 # endpoints
+    cost = 2    # endpoints
     description = "Straight line through end points"
 
     def __init__(self, data):
@@ -240,32 +243,33 @@ class FitSet(object):
 
     def __add__(self, other):
         return FitSet(self.fits + other.fits)
-            
+
     def __len__(self):
         return len(self.fits)
-    
+
     def __repr__(self):
         return self.fits.__repr__()
-        
-#TODO: change logic to use FitSet class        
+
+#TODO: change logic to use FitSet class
 
 
 class SegmentationAlgorithm:
     pass
 
+
 class TopDown(SegmentationAlgorithm):
     name = "TopDown"
-    
+
     def __init__(self, fitter, fitbudget, stride=1):
         self.fitter = fitter
         self.fitbudget = fitbudget
         self.stride = stride
         self.clearstore()
-        
+
     def clearstore(self):
         self.solutionstore = {}
         self.done = False
-        
+
     def topdown(self, data, fitbudget, depth=1):
 
         def localtopdown(d, fitb):
@@ -273,7 +277,7 @@ class TopDown(SegmentationAlgorithm):
             if problemparameters not in self.solutionstore:
                 self.solutionstore[problemparameters] = self.topdown(d, fitb, depth+1)
             return self.solutionstore[problemparameters]
-        
+
         fit = self.fitter(data)
         if fitbudget == 1:
             return FitSet([fit])
@@ -292,18 +296,20 @@ class TopDown(SegmentationAlgorithm):
                 if totalerror < bestsofar:
                     bestsofar = totalerror
                     bestfit = fits
-                logging.info("%10i, %10i, %10s, %10f, %10i" %  (depth, len(self.solutionstore), str(data.xrange), totalerror, bestsofar))
+                logging.info("%10i, %10i, %10s, %10f, %10i" %
+                             (depth, len(self.solutionstore), str(data.xrange), totalerror, bestsofar))
             # return best subdivision
             return bestfit
-            
+
     def segment(self, data):
         self.clearstore()
         self.fits = self.topdown(data, self.fitbudget)
         return self.fits
 
+
 class BottomUp(SegmentationAlgorithm):
     name = "BottomUp"
-    
+
     def __init__(self, fitter, fitbudget, stride=1, epsilon=0.2):
         self.fitter = fitter
         self.fitbudget = fitbudget
@@ -313,7 +319,7 @@ class BottomUp(SegmentationAlgorithm):
     def bottomup(self, data, fitbudget):
         # Seed initial data
         # NOTE: this is a really slow way of doing it.  Direct indexing would be much faster
-        
+
         workingdata = []
         fits = FitSet()
         rest = data
@@ -321,12 +327,12 @@ class BottomUp(SegmentationAlgorithm):
             firstgroup, rest = rest.split(self.stride+1)
             workingdata.append(firstgroup)
             fits.append(self.fitter(firstgroup))
-    
+
         initialerror = fits.error
-        
+
         if initialerror > self.epsilon:
             return fits
-        
+
         while len(fits) > 1:
             # build pairs of fits
             pairs = [self.fitter(fits.fits[i].data + fits.fits[i+1].data) for i in range(len(fits)-1)]
@@ -338,14 +344,15 @@ class BottomUp(SegmentationAlgorithm):
                     bestbreak = i
             if pairs[bestbreak].error > self.epsilon:
                 break
-            # merge best break 
+            # merge best break
             fits.fits[bestbreak] = pairs[bestbreak]
             del fits.fits[bestbreak+1]
-            
+
         return fits
-    
+
     def segment(self, data):
         return self.bottomup(data, self.fitbudget)
+
 
 def testts():
     d = ts.tsfromtxt('testdata/weight.dat',
@@ -368,15 +375,15 @@ if __name__ == "__main__":
     else:
         filename = sys.argv[1]
         stride = 1
-        
+
     #lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
     lineartest = DataContainer.fromfile(filename)
     fronts = []
     fitrange = range(3, 4)
-    fittypes = (ConstantPiecewise, 
-                LinearRegression, 
-                QuadraticRegression, 
-                LineThroughEndPoints, 
+    fittypes = (ConstantPiecewise,
+                LinearRegression,
+                QuadraticRegression,
+                LineThroughEndPoints,
                 ExponentialRegression,
                 )
     for fittype in fittypes:
@@ -397,6 +404,7 @@ if __name__ == "__main__":
                 fits.plot()
             plt.figure()
             plt.plot(fitrange, fiterror)
+
     plt.figure()
     for front in fronts:
         plt.plot(fitrange, front)
