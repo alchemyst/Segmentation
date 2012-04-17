@@ -9,6 +9,7 @@ import sys
 import logging
 logging.basicConfig(level=logging.WARN)
 
+
 class DataContainer(object):
     """Generic container for timeseries data"""
 
@@ -24,32 +25,38 @@ class DataContainer(object):
         assert len(x) == len(y)
         self.x = numpy.asarray(x)
         self.y = numpy.asarray(y)
-    
+
     @property
     def xrange(self):
         return (min(self.x), max(self.x))
-    
+
     def __repr__(self):
         return "DataContainer x=" + str(self.x) + ", y=" + str(self.y)
-    
+
     def __len__(self):
         return len(self.x)
-    
+
     def plot(self):
         plt.plot(self.x, self.y, '.')
-    
+
     def values(self):
         return self.x, self.y
 
     def split(self, i):
         """ split the container at point i, returning two containers both containing that point """
         return DataContainer(self.x[:i], self.y[:i]), DataContainer(self.x[i-1:], self.y[i-1:])
-    
+
     def __add__(self, other):
         return DataContainer(numpy.append(self.x,  other.x), numpy.append(self.y, other.y))
-    
+
     def merge(self, other):
+        # FIXME: merge is not symmetrical to split!
         self += other
+
+    def contains(self, x):
+        # TODO: Figure out how the inequalities have to work out for consistency
+        minx, maxx = self.xrange
+        return minx <= x <= maxx
 
 
 class Fitter:
@@ -66,7 +73,7 @@ class Fitter:
     def divisions(self, N, stride):
         """ return iterator for division points of N-length data """
         return xrange(self.minlength, N-self.minlength+1, stride)
-    
+
     def plot(self):
         self.data.plot()
         x, y = self.plotvals()
@@ -88,44 +95,48 @@ class ConstantPiecewise(Fitter):
     minlength = 1
     cost = 3 # endpoints, coeffs
     description = "Constants"
+    
     def __init__(self, data):
         Fitter.__init__(self, data)
         self.value = numpy.mean(self.data.y)
         self.calcresiduals()
         self.liney = self.eval(numpy.array(self.xrange))
-    
+
     def eval(self, x):
         rval = x.copy()
         rval.fill(self.value)
         return rval
-        
+
     def plotvals(self):
         return self.xrange, self.liney
-    
+
     def __repr__(self):
         return "Constant through %i data points: y = %f, error = %f" %  \
                (len(self.data),) + self.coeff + (self.error,)
-        
+
+
 class LinearRegression(Fitter):
     """ Linear regression class fits its data with straight line """
     minlength = 2
     cost = 4 # endpoints, coeffs
     description = "Linear regression"
+
     def __init__(self, data):
         Fitter.__init__(self, data)
         self.coeff = numpy.polyfit(self.data.x, self.data.y, 1)
         self.calcresiduals()
         self.liney = self.eval(self.xrange)
-    
+
     def eval(self, x):
         return numpy.polyval(self.coeff, x)
-        
+
     def plotvals(self):
         return self.xrange, self.liney
-    
+
     def __repr__(self):
         return "Linear fit through %i data points: y = %f*x + %f, error = %f" %  \
                (len(self.data), self.coeff[0], self.coeff[1], self.error)
+
 
 class QuadraticRegression(Fitter):
     """ Quadratic regression class fits its data with a parabola """
@@ -137,10 +148,10 @@ class QuadraticRegression(Fitter):
         self.coeff = numpy.polyfit(self.data.x, self.data.y, 2)
         self.calcresiduals()
         self.liney = self.eval(self.xrange)
-    
+
     def eval(self, x):
         return numpy.polyval(self.coeff, x)
-        
+
     def __repr__(self):
         return "Quadratic fit through %i data points: y = %f*x^2 + %f*x + %f, error = %f" %  \
                (len(self.data),) + self.coeff + (self.error,)
@@ -151,6 +162,7 @@ class LineThroughEndPoints(Fitter):
     minlength = 2
     cost = 2 # endpoints
     description = "Straight line through end points"
+
     def __init__(self, data):
         Fitter.__init__(self, data)
         self.liney = [data.y[0], data.y[-1]]
@@ -162,22 +174,23 @@ class LineThroughEndPoints(Fitter):
 
     def plotvals(self):
         return self.xrange, self.liney
-        
+
     def __repr__(self):
         return "Straight line through endpoints of %i data" % len(self.data)
-        
+
 
 class ExponentialRegression(Fitter):
     """ Exponential regression class - y = y0 + k(1-exp(-(x-x0)/tau)) """
     minlength = 9
     cost = 4
     description = "Exponential regression"
+
     def __init__(self, data):
         Fitter.__init__(self, data)
-        
+
         def form(x, offset, k, tau):
             return offset + k*(1-numpy.exp(-(x-x[0])/tau))
-        
+
         guess = [self.data.y[0], self.data.y[-1] - self.data.y[0], 20]
         try:
             popt, pcov = scipy.optimize.minpack.curve_fit(form, self.data.x, self.data.y, guess)
@@ -186,12 +199,12 @@ class ExponentialRegression(Fitter):
         except RuntimeError:
             self.offset, self.k, self.tau = guess
             self.optimal = False
-            
-        self.calcresiduals()     
-        
+
+        self.calcresiduals()
+
     def eval(self, x):
         return self.offset + self.k*(1 - numpy.exp(-(x - self.xrange[0])/self.tau))
-        
+
     def __repr__(self):
         return "Exponential through %i data points: tau = %f, k = %f" % \
                (len(self.data), self.tau, self.k)
@@ -199,21 +212,31 @@ class ExponentialRegression(Fitter):
 
 class FitSet(object):
     def __init__(self, fits=None):
-        if fits:
-            self.fits = fits
-        else:
+        if fits is None:
             self.fits = []
+        else:
+            self.fits = fits
 
-    @property    
+    @property
     def error(self):
         return numpy.linalg.norm(numpy.hstack(f.residuals for f in self.fits))
-    
+
     def plot(self):
         for f in self.fits:
             f.plot()
-            
-    def append(self, fit):	
+
+    def append(self, fit):
         self.fits.append(fit)
+
+    def eval(self, xs):
+        if not hasattr(xs, "__iter__"):
+            for fit in self.fits:
+                if fit.data.contains(xs):
+                    return fit.eval(xs)
+            else:
+                raise ValueError
+        else:
+            return numpy.array(map(self.eval, xs))
 
     def __add__(self, other):
         return FitSet(self.fits + other.fits)
@@ -223,7 +246,6 @@ class FitSet(object):
     
     def __repr__(self):
         return self.fits.__repr__()
-        
         
 #TODO: change logic to use FitSet class        
 

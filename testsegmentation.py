@@ -22,6 +22,10 @@ class TestDataContainer(unittest.TestCase):
         a = segment.DataContainer(self.x, self.y)
         assert a.xrange == (1, 3)
     
+    def testcontainsx(self):
+        a = segment.DataContainer(self.x, self.y)
+        assert a.contains(2)
+    
     def testfromtable(self):
         """class method for construction from table"""
         a = segment.DataContainer.fromtable(numpy.vstack((self.x, self.y)).T)
@@ -82,6 +86,28 @@ class TestBottomUp(unittest.TestCase):
         s = segment.BottomUp(segment.LinearRegression, 2)
         s.segment(self.data)
         
-
+class TestFitsSet(unittest.TestCase):
+    def setUp(self):
+        self.a = segment.LineThroughEndPoints(segment.DataContainer([1, 2], [1, 2]))
+        self.b = segment.LineThroughEndPoints(segment.DataContainer([2, 3], [2, 1]))
+    
+    def testInit(self):
+        s = segment.FitSet()
+        
+    def testAppend(self):
+        s = segment.FitSet([self.a])
+        self.assert_(len(s) == 1, "Construction failed to add one element")
+        s.append(self.b)
+        self.assert_(len(s) == 2, "Append failed to add one element")
+        
+    def testEvalSingle(self):
+        s = segment.FitSet([self.a])
+        self.assertAlmostEqual(s.eval(1.5), 1.5, 2, "Evaluation at single point failed")
+    
+    def testEvalMany(self):
+        s = segment.FitSet([self.a, self.b])
+        for x, expectedy in zip([1.5, 2.5], [1.5, 1.5]):
+            self.assertAlmostEqual(s.eval(x), expectedy, 2, "Evaluation with multiple fits failed")
+    
 if __name__ == '__main__':
     unittest.main() 
