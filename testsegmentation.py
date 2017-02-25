@@ -14,23 +14,23 @@ class TestDataContainer(unittest.TestCase):
     def testinit(self):
         """construction from x and y data"""
         a = segment.DataContainer(self.x, self.y)
-        assert numpy.all(self.x == a.x)
-        assert numpy.all(self.y == a.y)
+        self.assert_(numpy.all(self.x == a.x))
+        self.assert_(numpy.all(self.y == a.y))
 
     def testxrange(self):
         """ xrange property """
         a = segment.DataContainer(self.x, self.y)
-        assert a.xrange == (1, 3)
+        self.assertEqual(a.xrange, (1, 3))
 
     def testcontainsx(self):
         a = segment.DataContainer(self.x, self.y)
-        assert a.contains(2)
+        self.assert_(a.contains(2))
 
     def testfromtable(self):
         """class method for construction from table"""
         a = segment.DataContainer.fromtable(numpy.vstack((self.x, self.y)).T)
-        assert numpy.all(self.x == a.x)
-        assert numpy.all(self.y == a.y)
+        self.assert_(numpy.all(self.x == a.x))
+        self.assert_(numpy.all(self.y == a.y))
 
     def testfromfile(self):
         """class method to read data from file"""
@@ -46,15 +46,15 @@ class TestDataContainer(unittest.TestCase):
         a = segment.DataContainer(self.x, self.y)
         b = segment.DataContainer(self.x2, self.y2)
         c = a + b
-        assert numpy.all(c.x == numpy.append(self.x, self.x2))
-        assert numpy.all(c.y == numpy.append(self.y, self.y2))
+        self.assert_(numpy.all(c.x == numpy.append(self.x, self.x2)))
+        self.assert_(numpy.all(c.y == numpy.append(self.y, self.y2)))
 
     def testiadd(self):
         a = segment.DataContainer(self.x, self.y)
         b = segment.DataContainer(self.x2, self.y2)
         a += b
-        assert numpy.all(a.x == numpy.append(self.x, self.x2))
-        assert numpy.all(a.y == numpy.append(self.y, self.y2))
+        self.assert_(numpy.all(a.x == numpy.append(self.x, self.x2)))
+        self.assert_(numpy.all(a.y == numpy.append(self.y, self.y2)))
 
 
 class TestLinearRegression(unittest.TestCase):
@@ -68,8 +68,8 @@ class TestLinearRegression(unittest.TestCase):
     def testFit(self):
         "Realistic linear fit"
         self.testInit()
-        assert len(self.fitter.coeff) == 2, "Linear fit has two coefficients"
-        assert self.fitter.error < 0.05, "Fit error is too large"
+        self.assertEqual(len(self.fitter.coeff), 2, "Linear fit has two coefficients")
+        self.assertLess(self.fitter.error, 0.05, "Fit error is too large")
 
 
 class TestTopDown(unittest.TestCase):
