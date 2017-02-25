@@ -14,8 +14,8 @@ class TestDataContainer(unittest.TestCase):
     def testinit(self):
         """construction from x and y data"""
         a = segment.DataContainer(self.x, self.y)
-        self.assert_(numpy.all(self.x == a.x))
-        self.assert_(numpy.all(self.y == a.y))
+        self.assertTrue(numpy.all(self.x == a.x))
+        self.assertTrue(numpy.all(self.y == a.y))
 
     def testxrange(self):
         """ xrange property """
@@ -24,13 +24,13 @@ class TestDataContainer(unittest.TestCase):
 
     def testcontainsx(self):
         a = segment.DataContainer(self.x, self.y)
-        self.assert_(a.contains(2))
+        self.assertTrue(a.contains(2))
 
     def testfromtable(self):
         """class method for construction from table"""
         a = segment.DataContainer.fromtable(numpy.vstack((self.x, self.y)).T)
-        self.assert_(numpy.all(self.x == a.x))
-        self.assert_(numpy.all(self.y == a.y))
+        self.assertTrue(numpy.all(self.x == a.x))
+        self.assertTrue(numpy.all(self.y == a.y))
 
     def testfromfile(self):
         """class method to read data from file"""
@@ -46,15 +46,15 @@ class TestDataContainer(unittest.TestCase):
         a = segment.DataContainer(self.x, self.y)
         b = segment.DataContainer(self.x2, self.y2)
         c = a + b
-        self.assert_(numpy.all(c.x == numpy.append(self.x, self.x2)))
-        self.assert_(numpy.all(c.y == numpy.append(self.y, self.y2)))
+        self.assertTrue(numpy.all(c.x == numpy.append(self.x, self.x2)))
+        self.assertTrue(numpy.all(c.y == numpy.append(self.y, self.y2)))
 
     def testiadd(self):
         a = segment.DataContainer(self.x, self.y)
         b = segment.DataContainer(self.x2, self.y2)
         a += b
-        self.assert_(numpy.all(a.x == numpy.append(self.x, self.x2)))
-        self.assert_(numpy.all(a.y == numpy.append(self.y, self.y2)))
+        self.assertTrue(numpy.all(a.x == numpy.append(self.x, self.x2)))
+        self.assertTrue(numpy.all(a.y == numpy.append(self.y, self.y2)))
 
 
 class TestLinearRegression(unittest.TestCase):
@@ -100,9 +100,9 @@ class TestFitsSet(unittest.TestCase):
 
     def testAppend(self):
         s = segment.FitSet([self.a])
-        self.assert_(len(s) == 1, "Construction failed to add one element")
+        self.assertTrue(len(s) == 1, "Construction failed to add one element")
         s.append(self.b)
-        self.assert_(len(s) == 2, "Append failed to add one element")
+        self.assertTrue(len(s) == 2, "Append failed to add one element")
 
     def testEvalSingle(self):
         s = segment.FitSet([self.a])

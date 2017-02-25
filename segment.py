@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 # Time-series segmentation module
 
 import matplotlib.pyplot as plt
@@ -74,7 +76,7 @@ class Fitter:
     @classmethod
     def divisions(self, N, stride):
         """ return iterator for division points of N-length data """
-        return xrange(self.minlength, N-self.minlength+1, stride)
+        return range(self.minlength, N-self.minlength+1, stride)
 
     def plot(self):
         self.data.plot()
@@ -323,7 +325,7 @@ class BottomUp(SegmentationAlgorithm):
         workingdata = []
         fits = FitSet()
         rest = data
-        for i in range(len(data)/self.stride - 1):
+        for i in range(len(data)//self.stride - 1):
             firstgroup, rest = rest.split(self.stride+1)
             workingdata.append(firstgroup)
             fits.append(self.fitter(firstgroup))
@@ -387,13 +389,13 @@ if __name__ == "__main__":
                 ExponentialRegression,
                 )
     for fittype in fittypes:
-        print fittype.description
+        print(fittype.description)
         allfits = []
         fiterror = []
         segmenter = TopDown(fittype, 1, stride=stride)
         for i in fitrange:
             segmenter.fitbudget = i
-            print "fitting %i items" % i
+            print("fitting %i items" % i)
             fits = segmenter.segment(lineartest)
             allfits.append(fits)
             fiterror.append(fits.error/len(lineartest))

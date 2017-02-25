@@ -4,6 +4,8 @@ language: python
 
 python:
   - "2.7"
+  - "3.5"
+  - "3.6"
 
 cache:
   apt: true
@@ -35,7 +37,7 @@ before_install:
 install:
   # TODO: Figure out how to read this from requirements.txt
   - conda install --yes python=$TRAVIS_PYTHON_VERSION scipy matplotlib
- 
+
 # Run test
 script:
   - python testsegmentation.py
