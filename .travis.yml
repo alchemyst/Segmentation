@@ -38,4 +38,4 @@ install:
  
 # Run test
 script:
-  - python testsegmegmentation.py
+  - python testsegmentation.py
