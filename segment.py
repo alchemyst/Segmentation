@@ -312,13 +312,12 @@ class TopDown(SegmentationAlgorithm):
 class BottomUp(SegmentationAlgorithm):
     name = "BottomUp"
 
-    def __init__(self, fitter, fitbudget, stride=1, epsilon=0.2):
+    def __init__(self, fitter, epsilon=0.2):
         self.fitter = fitter
-        self.fitbudget = fitbudget
         self.stride = 1
         self.epsilon = epsilon
 
-    def bottomup(self, data, fitbudget):
+    def bottomup(self, data):
         # Seed initial data
         # NOTE: this is a really slow way of doing it.  Direct indexing would be much faster
 
@@ -353,7 +352,7 @@ class BottomUp(SegmentationAlgorithm):
         return fits
 
     def segment(self, data):
-        return self.bottomup(data, self.fitbudget)
+        return self.bottomup(data)
 
 
 def testts():
@@ -381,7 +380,7 @@ if __name__ == "__main__":
     #lineartest = DataContainer.fromfile('testdata/weightindexed_small.dat')
     lineartest = DataContainer.fromfile(filename)
     fronts = []
-    fitrange = range(3, 4)
+    fitrange = range(2, 5)
     fittypes = (ConstantPiecewise,
                 LinearRegression,
                 QuadraticRegression,
@@ -392,7 +391,7 @@ if __name__ == "__main__":
         print(fittype.description)
         allfits = []
         fiterror = []
-        segmenter = TopDown(fittype, 1, stride=stride)
+        segmenter = TopDown(fittype, fitbudget=1, stride=stride)
         for i in fitrange:
             segmenter.fitbudget = i
             print("fitting %i items" % i)
