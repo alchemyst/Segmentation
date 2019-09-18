@@ -1,0 +1,6 @@
+name: segmentation
+channels:
+ - defaults
+dependencies:
+ - matplotlib
+ - scipy

@@ -8,6 +8,7 @@ python:
   - "2.7"
   - "3.5"
   - "3.6"
+  - "3.7"
 
 cache:
   apt: true
@@ -34,8 +35,8 @@ before_install:
 
 # Install packages
 install:
-  # TODO: Figure out how to read this from requirements.txt
-  - conda install --yes python=$TRAVIS_PYTHON_VERSION scipy matplotlib
+  - conda env create --file environment.yml python=$TRAVIS_PYTHON_VERSION
+  - source activate segmentation
 
 # Run test
 script:
