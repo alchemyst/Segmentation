@@ -224,7 +224,7 @@ class FitSet(object):
 
     @property
     def error(self):
-        return numpy.linalg.norm(numpy.hstack(f.residuals for f in self.fits))
+        return numpy.linalg.norm(numpy.hstack([f.residuals for f in self.fits]))
 
     def plot(self):
         for f in self.fits:
