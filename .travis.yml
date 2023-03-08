@@ -44,4 +44,5 @@ install:
 
 # Run test
 script:
-  - python testsegmentation.py
+  - export PYTHONPATH=$(realpath .)
+  - pytest tests
