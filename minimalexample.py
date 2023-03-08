@@ -17,12 +17,12 @@ fits = segmenter.segment(data)
 line1, line2 = fits.fits
 
 # Print a summary
-print "I have fitted two lines to the data given in this table:"
+print("I have fitted two lines to the data given in this table:")
 for x, y in zip(data.x, data.y):
     print(x, y)
 
-print "The overall error is", fits.error
-print "The fits are as follows:"
+print("The overall error is", fits.error)
+print("The fits are as follows:")
 for i, fit in enumerate(fits.fits):
     print(i+1, "-", fit)
 
